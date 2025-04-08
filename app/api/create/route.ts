@@ -1,4 +1,3 @@
-import type { NextRequest } from 'next/server'
 import { ScrapybaraClient } from 'scrapybara'
 import pino from 'pino'
 
@@ -31,7 +30,7 @@ nvm current # Should print "v22.14.0".
 npm -v # Should print "10.9.2".
 `
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const logger = pino({
     name: 'create',
   })

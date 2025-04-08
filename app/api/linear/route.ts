@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server'
 import pino from 'pino'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   const logger = pino({
     name: 'linear',
   })

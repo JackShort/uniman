@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server'
-import { LinearClient } from '@linear/sdk'
+import { Issue, LinearClient } from '@linear/sdk'
 import pino from 'pino'
 import { exec, spawn } from 'child_process'
 import * as os from 'os';
@@ -12,6 +12,7 @@ const UNIMAN_LABEL = 'UNIMAN'
 
 type LinearIssue = {
   action: string
+  type: 'Issue'
   data: {
       id: string
       labels: {
@@ -19,6 +20,13 @@ type LinearIssue = {
       }[]
       description: string | null
     }
+} | {
+  action: string
+  type: 'Comment'
+  data: {
+    body: string
+    issueId: string
+  }
 }
 
 export async function GET() {
@@ -36,23 +44,42 @@ export async function POST(req: NextRequest) {
     name: 'linear',
   })
 
-  const body = await req.json() as LinearIssue
-
-  // Api key authentication
   const linearClient = new LinearClient({
     apiKey: process.env.LINEAR_API_KEY
   })
 
-  const issue = await linearClient.issue(body.data.id)
+  const body = await req.json() as LinearIssue
 
-  if (body.action !== 'create' || !issue.description || !body.data.labels.some((label) => label.name === UNIMAN_LABEL)) {
+  let issue: Issue
+  let reroll = false
+  if (body.type === 'Comment') {
+    if (body.data.body !== "reroll") {
+      logger.info('Not an uniman action')
+      return Response.json({ message: 'Not an uniman action' }, { status: 200 })
+    }
+
+    issue = await linearClient.issue(body.data.issueId)
+    reroll = true
+  } else {
+    issue = await linearClient.issue(body.data.id)
+  }
+
+  const labels = await issue.labels()
+  const label = labels.nodes.find((label) => label.name === UNIMAN_LABEL)
+
+  if (!label) {
+    logger.info('Not an uniman action')
+    return Response.json({ message: 'Not an uniman action' }, { status: 200 })
+  }
+
+  if (body.action !== 'create' || !issue.description) {
     logger.info('Not an uniman action')
     return Response.json({ message: 'Not an uniman action' }, { status: 200 })
   }
 
   linearClient.createComment({
-    issueId: body.data.id,
-    body: 'Uniman is coming to the rescue! \n ![alt text](https://sdmntprnorthcentralus.oaiusercontent.com/files/00000000-33f0-622f-9f9a-7f140b6e97ca/raw?se=2025-04-09T20%3A24%3A20Z&sp=r&sv=2024-08-04&sr=b&scid=419dbe1d-83a6-5ce7-839a-db7720769c1a&skoid=de76bc29-7017-43d4-8d90-7a49512bae0f&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-04-09T17%3A58%3A07Z&ske=2025-04-10T17%3A58%3A07Z&sks=b&skv=2024-08-04&sig=PrZPLl9dMRagCwSANN726s4XaPlInWgiAd4qgKwgs0M%3D)"'
+    issueId: issue.id,
+    body: 'Uniman is coming to the rescue! \n ![alt text](https://sdmntprnorthcentralus.oaiusercontent.com/files/00000000-13cc-522f-8120-907d2b0ebf2a/raw?se=2025-04-09T20%3A54%3A51Z&sp=r&sv=2024-08-04&sr=b&scid=d876236a-2797-59a4-962e-0a3546b4aa2d&skoid=de76bc29-7017-43d4-8d90-7a49512bae0f&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-04-09T17%3A58%3A05Z&ske=2025-04-10T17%3A58%3A05Z&sks=b&skv=2024-08-04&sig=5BPofh6yqWMqUhMkWZdK8sHbeoL6H96we4nwqLbFH9M%3D)"'
   })
 
 const universeDir = path.join(os.homedir(), 'Documents', 'universe');
@@ -62,7 +89,11 @@ const claudeCommand = 'claude'; // Or full path
 logger.info(`Spawning command in directory: ${universeDir}`);
 // console.log(`Command: ${claudeCommand} [args] > ${logPath}`);
 
-exec(`cd ${universeDir} && gt create ${issue.branchName}`)
+if (reroll) {
+  exec(`cd ${universeDir} && gt checkout ${issue.branchName}`)
+} else {
+  exec(`cd ${universeDir} && gt create ${issue.branchName}`)
+}
 
 const claudeProcess = spawn(
   claudeCommand,

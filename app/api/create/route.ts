@@ -78,11 +78,11 @@ export async function GET() {
 
   logger.info('Successfully installed claude')
 
-  await instance.bash({
-    command: 'gh repo clone https://github.com/Uniswap/universe.git'
-  })
+  // await instance.bash({
+  //   command: 'gh repo clone https://github.com/Uniswap/universe.git'
+  // })
 
-  logger.info('Successfully cloned universe repo')
+  // logger.info('Successfully cloned universe repo')
 
   await instance.bash({
     command: 'sudo apt-get install ripgrep'

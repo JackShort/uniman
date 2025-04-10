@@ -52,10 +52,18 @@ export async function POST(req: NextRequest) {
 
   let issue: Issue
   let reroll = false
+  let rerollCommand: string | undefined
   if (body.type === 'Comment') {
-    if (body.data.body !== "reroll") {
+    if (!body.data.body.startsWith("reroll")) {
       logger.info('Not an uniman action')
       return Response.json({ message: 'Not an uniman action' }, { status: 200 })
+    }
+
+    if (body.data.body.startsWith("reroll:")) {
+      rerollCommand = body.data.body.split(":")[1]
+      if (rerollCommand.length === 0) {
+        rerollCommand = undefined
+      }
     }
 
     issue = await linearClient.issue(body.data.issueId)
@@ -79,7 +87,7 @@ export async function POST(req: NextRequest) {
 
   linearClient.createComment({
     issueId: issue.id,
-    body: 'Uniman is coming to the rescue! \n ![alt text](https://sdmntprnorthcentralus.oaiusercontent.com/files/00000000-13cc-522f-8120-907d2b0ebf2a/raw?se=2025-04-09T20%3A54%3A51Z&sp=r&sv=2024-08-04&sr=b&scid=d876236a-2797-59a4-962e-0a3546b4aa2d&skoid=de76bc29-7017-43d4-8d90-7a49512bae0f&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-04-09T17%3A58%3A05Z&ske=2025-04-10T17%3A58%3A05Z&sks=b&skv=2024-08-04&sig=5BPofh6yqWMqUhMkWZdK8sHbeoL6H96we4nwqLbFH9M%3D)"'
+    body: 'Uniman is coming to the rescue! \n ![alt text](https://sdmntprnorthcentralus.oaiusercontent.com/files/00000000-13cc-522f-8120-907d2b0ebf2a/raw?se=2025-04-09T20%3A54%3A51Z&sp=r&sv=2024-08-04&sr=b&scid=d876236a-2797-59a4-962e-0a3546b4aa2d&skoid=de76bc29-7017-43d4-8d90-7a49512bae0f&sktid=a48cca56-e6da-484e-a814-9c849652bcb3&skt=2025-04-09T17%3A58%3A05Z&ske=2025-04-10T17%3A58%3A05Z&sks=b&skv=2024-08-04&sig=5BPofh6yqWMqUhMkWZdK8sHbeoL6H96we4nwqLbFH9M%3D)'
   })
 
 const universeDir = path.join(os.homedir(), 'Documents', 'universe');
@@ -95,11 +103,16 @@ if (reroll) {
   exec(`cd ${universeDir} && gt create ${issue.branchName}`)
 }
 
+let prompt = issue.description
+if (rerollCommand) {
+  prompt = `Goal:${claudeCommand}\nNotes:${rerollCommand}`
+}
+
 const claudeProcess = spawn(
   claudeCommand,
   [ // Arguments are passed as an array
     '-p',
-    issue.description,
+    prompt,
     '--allowedTools',
     'Edit',
   ],

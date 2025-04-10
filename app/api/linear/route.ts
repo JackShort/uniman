@@ -52,10 +52,18 @@ export async function POST(req: NextRequest) {
 
   let issue: Issue
   let reroll = false
+  let rerollCommand: string | undefined
   if (body.type === 'Comment') {
-    if (body.data.body !== "reroll") {
+    if (!body.data.body.startsWith("reroll")) {
       logger.info('Not an uniman action')
       return Response.json({ message: 'Not an uniman action' }, { status: 200 })
+    }
+
+    if (body.data.body.startsWith("reroll:")) {
+      rerollCommand = body.data.body.split(":")[1]
+      if (rerollCommand.length === 0) {
+        rerollCommand = undefined
+      }
     }
 
     issue = await linearClient.issue(body.data.issueId)
@@ -95,11 +103,18 @@ if (reroll) {
   exec(`cd ${universeDir} && gt create ${issue.branchName}`)
 }
 
+let prompt = issue.description
+if (rerollCommand) {
+  prompt = `Goal:${claudeCommand}\nNotes:${rerollCommand}`
+}
+
+console.log(prompt)
+
 const claudeProcess = spawn(
   claudeCommand,
   [ // Arguments are passed as an array
     '-p',
-    issue.description,
+    prompt,
     '--allowedTools',
     'Edit',
   ],
